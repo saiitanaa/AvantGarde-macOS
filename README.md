@@ -6,7 +6,8 @@
 It operates as a standalone application that works with your IDE, rather than as an extension to an IDE. This means that
 Avant Garde is completely IDE agnostic.
 
-**[DOWNLOAD & INSTALL](https://github.com/kuiperzone/AvantGarde/releases/latest)**
+**[DOWNLOAD & INSTALL](https://github.com/saiitanaa/AvantGarde-macOS/releases)**
+**[ORIGINAL PROJECT](https://github.com/kuiperzone/AvantGarde)**
 
 Avant Garde is licensed under GPLv3 or later.
 
