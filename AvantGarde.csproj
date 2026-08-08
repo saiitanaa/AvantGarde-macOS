@@ -18,8 +18,8 @@
         <SelfContained>true</SelfContained>
 
         <Product>Avant Garde</Product>
-        <Authors>saiitanaa</Authors>
-        <Copyright>© Saiitanaa 2026</Copyright>
+        <Authors>Andy Thomas</Authors>
+        <Copyright>© Andy Thomas 2026-25</Copyright>
         <Company>Kuiper Zone</Company>
         <Description>Avant Garde is a cross-platform XAML previewer for the Avalonia .NET Framework.</Description>
         <Language>en-US</Language>
