@@ -1,6 +1,6 @@
 <img src="Media/Github-banner.png" style="width:50%;max-width:1200px;margin-bottom:4em;"/>
 
-# Avant Garde macOS #
+# ⌘ Avant Garde macOS #
 
 **Avant Garde** is a cross-platform XAML previewer for the C# [Avalonia Framework](https://github.com/AvaloniaUI/Avalonia).
 It operates as a standalone application that works with your IDE, rather than as an extension to an IDE. This means that
