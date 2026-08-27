@@ -1,0 +1,246 @@
+// -----------------------------------------------------------------------------
+// PROJECT   : Avant Garde
+// COPYRIGHT : Andy Thomas (C) 2022-25
+// LICENSE   : GPL-3.0-or-later
+// HOMEPAGE  : https://github.com/kuiperzone/AvantGarde
+//
+// Avant Garde is free software: you can redistribute it and/or modify it under
+// the terms of the GNU General Public License as published by the Free Software
+// Foundation, either version 3 of the License, or (at your option) any later version.
+//
+// Avant Garde is distributed in the hope that it will be useful, but WITHOUT
+// ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+// FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License along
+// with Avant Garde. If not, see <https://www.gnu.org/licenses/>.
+// -----------------------------------------------------------------------------
+
+using System.Text;
+using Avalonia;
+using Avalonia.Input;
+using Avalonia.Remote.Protocol.Input;
+
+using ProtocolButton = Avalonia.Remote.Protocol.Input.MouseButton;
+using ProtocolModifiers = Avalonia.Remote.Protocol.Input.InputModifiers;
+
+namespace AvantGarde.Loading;
+
+/// <summary>
+/// Class which decodes and carries a pointer event information.
+/// </summary>
+public sealed class PointerEventMessage
+{
+    private readonly Point _position;
+    private readonly Vector _delta;
+    private readonly ProtocolModifiers[] _modifiers;
+    private readonly ProtocolButton _button = ProtocolButton.None;
+
+    /// <summary>
+    /// Constructor. Mouse move.
+    /// </summary>
+    public PointerEventMessage(Visual sender, PointerEventArgs e)
+    {
+        IsMoved = true;
+        _position = GetPositionAndModifiers(sender, e, out _modifiers);
+    }
+
+    /// <summary>
+    /// Constructor. Pointer pressed.
+    /// </summary>
+    public PointerEventMessage(Visual sender, PointerPressedEventArgs e)
+    {
+        IsPressed = true;
+        _position = GetPositionAndModifiers(sender, e, out _modifiers);
+        _button = GetPressButton(sender, e);
+    }
+
+    /// <summary>
+    /// Constructor. Pointer released.
+    /// </summary>
+    public PointerEventMessage(Visual sender, PointerReleasedEventArgs e)
+    {
+        IsReleased = true;
+        _position = GetPositionAndModifiers(sender, e, out _modifiers);
+        _button = GetReleaseButton(e);
+    }
+
+    /// <summary>
+    /// Constructor. Wheel scrolled.
+    /// </summary>
+    public PointerEventMessage(Visual sender, PointerWheelEventArgs e)
+    {
+        IsScrolled = true;
+        _position = GetPositionAndModifiers(sender, e, out _modifiers);
+        _delta = e.Delta;
+    }
+
+    /// <summary>
+    /// Gets whether is move event.
+    /// </summary>
+    public readonly bool IsMoved;
+
+    /// <summary>
+    /// Gets whether is press event.
+    /// </summary>
+    public readonly bool IsPressed;
+
+    /// <summary>
+    /// Gets whether is released event.
+    /// </summary>
+    public readonly bool IsReleased;
+
+    /// <summary>
+    /// Gets whether is wheel scroll event.
+    /// </summary>
+    public readonly bool IsScrolled;
+
+    /// <summary>
+    /// Gets whether is press or release event.
+    /// </summary>
+    public bool IsPressOrReleased
+    {
+        get { return IsPressed || IsReleased; }
+    }
+
+    /// <summary>
+    /// Create an instance of protocol message.
+    /// </summary>
+    /// <exception cref="ArgumentException">Invalid scale value</exception>
+    public PointerEventMessageBase ToMessage(double scale)
+    {
+        if (scale < 0 || !double.IsFinite(scale))
+        {
+            throw new ArgumentException("Invalid scale value");
+        }
+
+        PointerEventMessageBase msg;
+
+        if (IsMoved)
+        {
+            msg = new PointerMovedEventMessage();
+        }
+        else
+        if (IsPressed)
+        {
+            var pressed = new PointerPressedEventMessage();
+            pressed.Button = _button;
+            msg = pressed;
+        }
+        else
+        if (IsReleased)
+        {
+            var released = new PointerReleasedEventMessage();
+            released.Button = _button;
+            msg = released;
+        }
+        else
+        if (IsScrolled)
+        {
+            var scrolled = new ScrollEventMessage();
+
+            // Not divided by the scale. The delta is in wheel notches on both sides of the wire -
+            // Avalonia's own wheel handling multiplies it by the scrollable's line height - whereas
+            // X and Y below are positions in the guest's own dips and do need dividing.
+            scrolled.DeltaX = _delta.X;
+            scrolled.DeltaY = _delta.Y;
+            msg = scrolled;
+        }
+        else
+        {
+            throw new ArgumentException("Invalid pointer type code");
+        }
+
+        msg.Modifiers = _modifiers;
+        msg.X = _position.X / scale;
+        msg.Y = _position.Y / scale;
+
+        return msg;
+    }
+
+    /// <summary>
+    /// Overrides.
+    /// </summary>
+    public override string ToString()
+    {
+        var sb = new StringBuilder();
+        sb.Append("PointerEventMessage: ");
+
+        if (IsMoved)
+        {
+            sb.Append(nameof(IsMoved));
+        }
+        else
+        if (IsPressed)
+        {
+            sb.Append(nameof(IsPressed));
+        }
+        else
+        if (IsReleased)
+        {
+            sb.Append(nameof(IsReleased));
+        }
+        else
+        if (IsScrolled)
+        {
+            sb.Append(nameof(IsScrolled));
+            sb.Append(' ');
+            sb.Append(_delta);
+        }
+
+        sb.Append(", ");
+        sb.Append(_position);
+
+        foreach (var item in _modifiers)
+        {
+            sb.Append(", ");
+            sb.Append(item);
+        }
+
+        return sb.ToString();
+    }
+
+    private static ProtocolButton GetReleaseButton(PointerReleasedEventArgs e)
+    {
+        switch (e.InitialPressMouseButton)
+        {
+            case Avalonia.Input.MouseButton.Left: return ProtocolButton.Left;
+            case Avalonia.Input.MouseButton.Right: return ProtocolButton.Right;
+            case Avalonia.Input.MouseButton.Middle: return ProtocolButton.Middle;
+            default: return ProtocolButton.None;
+        }
+    }
+
+    private static ProtocolButton GetPressButton(Visual sender, PointerEventArgs e)
+    {
+        var p = e.GetCurrentPoint(sender);
+
+        if (p.Properties.IsLeftButtonPressed)
+        {
+            return ProtocolButton.Left;
+        }
+
+        if (p.Properties.IsRightButtonPressed)
+        {
+            return ProtocolButton.Right;
+        }
+
+        if (p.Properties.IsMiddleButtonPressed)
+        {
+            return ProtocolButton.Middle;
+        }
+
+        return ProtocolButton.None;
+    }
+
+    private static Point GetPositionAndModifiers(Visual sender, PointerEventArgs e, out ProtocolModifiers[] mods)
+    {
+        var p = e.GetCurrentPoint(sender);
+
+        mods = InputMapper.GetModifiers(e.KeyModifiers, p.Properties.IsLeftButtonPressed,
+            p.Properties.IsRightButtonPressed, p.Properties.IsMiddleButtonPressed);
+
+        return p.Position;
+    }
+
+}
